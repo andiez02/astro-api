@@ -60,8 +60,15 @@ export class AppConfigService {
     return this.configService.get<string>('app.apiPrefix') ?? 'api/v1';
   }
 
-  get corsOrigin(): string {
-    return this.configService.get<string>('app.corsOrigin') ?? 'http://localhost:3001';
+  get corsOrigin(): string | string[] {
+    const origin = this.configService.get<string>('app.corsOrigin') ?? process.env.CORS_ORIGIN ?? 'http://localhost:3001';
+    
+    // Support multiple origins separated by comma
+    if (origin.includes(',')) {
+      return origin.split(',').map(o => o.trim());
+    }
+    
+    return origin.trim();
   }
 
   get logLevel(): string {

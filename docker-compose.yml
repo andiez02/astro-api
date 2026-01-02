@@ -1,47 +1,35 @@
 # =============================================================================
-# Docker Compose - Production Environment (Backend Only)
+# Docker Compose - Production
 # =============================================================================
-# Deploy cho EC2 hoặc production server
-# Chỉ chạy backend service, database chạy ở nơi khác (RDS, external server, etc.)
-# 
-# Usage:
-#   docker-compose up -d
-#   docker-compose down
-#   docker-compose logs -f backend
+# Backend only - Database runs externally (RDS, etc.)
 # =============================================================================
 
 version: '3.8'
 
 services:
-  # Backend API Service
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: astro_backend_prod
+    container_name: astro_backend
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      # Application
       NODE_ENV: production
       PORT: ${PORT:-3000}
       API_PREFIX: ${API_PREFIX:-api/v1}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      CORS_ORIGIN: ${CORS_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      
-      # Database (External - RDS, external server, etc.)
-      # Cấu hình DATABASE_URL hoặc các biến riêng lẻ
       DATABASE_URL: ${DATABASE_URL}
-      DATABASE_HOST: ${DATABASE_HOST:-localhost}
+      DATABASE_HOST: ${DATABASE_HOST}
       DATABASE_PORT: ${DATABASE_PORT:-5432}
-      DATABASE_NAME: ${DATABASE_NAME:-astro_db}
-      DATABASE_USER: ${DATABASE_USER:-astro_postgres}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USER: ${DATABASE_USER}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      
-      # JWT
       JWT_SECRET: ${JWT_SECRET}
-    # Note: Database chạy ở nơi khác, không có depends_on
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s

@@ -38,8 +38,11 @@ async function bootstrap() {
   // ==========================================================================
   // CORS Configuration
   // ==========================================================================
+  const corsOrigin = appConfigService.corsOrigin;
+  logger.log(`🔒 CORS Origin: ${JSON.stringify(corsOrigin)}`);
+  
   app.enableCors({
-    origin: appConfigService.corsOrigin,
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',

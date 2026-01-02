@@ -3,40 +3,32 @@
 # =============================================================================
 # Deployment Script for EC2
 # =============================================================================
-# Script để deploy ứng dụng lên EC2
-# Note: Database chạy ở nơi khác (RDS, external server, etc.)
-# 
-# Usage:
-#   chmod +x scripts/deploy.sh
-#   ./scripts/deploy.sh
-# =============================================================================
 
-set -e  # Exit on error
+set -e
 
 echo "=========================================="
 echo "🚀 Deploying Astro NFT Marketplace Backend"
 echo "=========================================="
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Check if .env file exists
+# Check .env file
 if [ ! -f .env ]; then
     echo -e "${RED}❌ Error: .env file not found!${NC}"
-    echo "Please create .env file from .env.example"
+    echo "Please create .env file"
     exit 1
 fi
 
-# Check if Docker is installed
+# Check Docker
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}❌ Error: Docker is not installed!${NC}"
     exit 1
 fi
 
-# Check if docker-compose is installed
 if ! command -v docker-compose &> /dev/null; then
     echo -e "${RED}❌ Error: docker-compose is not installed!${NC}"
     exit 1
@@ -44,37 +36,31 @@ fi
 
 echo -e "${GREEN}✅ Prerequisites check passed${NC}"
 
-# Note about external database
-echo -e "${YELLOW}ℹ️  Note: Database should be running externally (RDS, external server, etc.)${NC}"
-echo -e "${YELLOW}   Make sure DATABASE_URL or DATABASE_HOST is configured correctly in .env${NC}"
-echo ""
-
 # Stop existing containers
 echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
 docker-compose down || true
 
-# Pull latest code (if using git)
-# git pull origin main
-
-# Build and start containers
+# Build and start
 echo -e "${YELLOW}🔨 Building and starting containers...${NC}"
 docker-compose up -d --build
 
-# Wait for services to be healthy
-echo -e "${YELLOW}⏳ Waiting for backend to be ready...${NC}"
+# Wait for service
+echo -e "${YELLOW}⏳ Waiting for service to be ready...${NC}"
 sleep 10
 
-# Run database migrations
+# Run migrations
 echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
-docker-compose exec -T backend npm run prisma:migrate:prod || {
-    echo -e "${YELLOW}⚠️  Migration might have already been applied or database connection failed${NC}"
-    echo -e "${YELLOW}   Please check DATABASE_URL in .env file${NC}"
+# Wait a bit more for container to be fully ready
+sleep 5
+docker-compose exec -T backend npx prisma migrate deploy || {
+    echo -e "${YELLOW}⚠️  Migration might have already been applied or container not ready${NC}"
+    echo -e "${YELLOW}   Migrations will also run automatically on container start${NC}"
 }
 
-# Check if services are running
-echo -e "${YELLOW}🔍 Checking service health...${NC}"
+# Check status
+echo -e "${YELLOW}🔍 Checking service status...${NC}"
 if docker-compose ps | grep -q "Up"; then
-    echo -e "${GREEN}✅ Backend service is running!${NC}"
+    echo -e "${GREEN}✅ Service is running!${NC}"
     echo ""
     echo "=========================================="
     echo "📊 Service Status:"
@@ -90,8 +76,8 @@ if docker-compose ps | grep -q "Up"; then
     echo ""
     echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
 else
-    echo -e "${RED}❌ Error: Backend service failed to start!${NC}"
-    echo "Check logs with: docker-compose logs backend"
+    echo -e "${RED}❌ Error: Service failed to start!${NC}"
+    echo "Check logs: docker-compose logs backend"
     exit 1
 fi
 

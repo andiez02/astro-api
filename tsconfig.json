@@ -25,6 +25,8 @@
       "@nft/*": ["src/modules/nft/*"],
       "@health/*": ["src/health/*"]
     }
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "prisma.config.ts"]
 }
 
