@@ -4,6 +4,7 @@
 # Deployment Script for EC2
 # =============================================================================
 # Script để deploy ứng dụng lên EC2
+# Note: Database chạy ở nơi khác (RDS, external server, etc.)
 # 
 # Usage:
 #   chmod +x scripts/deploy.sh
@@ -43,47 +44,54 @@ fi
 
 echo -e "${GREEN}✅ Prerequisites check passed${NC}"
 
+# Note about external database
+echo -e "${YELLOW}ℹ️  Note: Database should be running externally (RDS, external server, etc.)${NC}"
+echo -e "${YELLOW}   Make sure DATABASE_URL or DATABASE_HOST is configured correctly in .env${NC}"
+echo ""
+
 # Stop existing containers
 echo -e "${YELLOW}📦 Stopping existing containers...${NC}"
-docker-compose -f docker-compose.prod.yml down || true
+docker-compose down || true
 
 # Pull latest code (if using git)
 # git pull origin main
 
 # Build and start containers
 echo -e "${YELLOW}🔨 Building and starting containers...${NC}"
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose up -d --build
 
 # Wait for services to be healthy
-echo -e "${YELLOW}⏳ Waiting for services to be healthy...${NC}"
+echo -e "${YELLOW}⏳ Waiting for backend to be ready...${NC}"
 sleep 10
 
 # Run database migrations
 echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
-docker-compose -f docker-compose.prod.yml exec -T backend npm run prisma:migrate:prod || {
-    echo -e "${YELLOW}⚠️  Migration might have already been applied${NC}"
+docker-compose exec -T backend npm run prisma:migrate:prod || {
+    echo -e "${YELLOW}⚠️  Migration might have already been applied or database connection failed${NC}"
+    echo -e "${YELLOW}   Please check DATABASE_URL in .env file${NC}"
 }
 
 # Check if services are running
 echo -e "${YELLOW}🔍 Checking service health...${NC}"
-if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
-    echo -e "${GREEN}✅ Services are running!${NC}"
+if docker-compose ps | grep -q "Up"; then
+    echo -e "${GREEN}✅ Backend service is running!${NC}"
     echo ""
     echo "=========================================="
     echo "📊 Service Status:"
     echo "=========================================="
-    docker-compose -f docker-compose.prod.yml ps
+    docker-compose ps
     echo ""
     echo "=========================================="
     echo "🌐 Application URLs:"
     echo "=========================================="
-    echo "Backend API: http://localhost:${PORT:-3000}/api/v1"
-    echo "Health Check: http://localhost:${PORT:-3000}/api/v1/health"
+    PORT=${PORT:-3000}
+    echo "Backend API: http://localhost:${PORT}/api/v1"
+    echo "Health Check: http://localhost:${PORT}/api/v1/health"
     echo ""
     echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
 else
-    echo -e "${RED}❌ Error: Services failed to start!${NC}"
-    echo "Check logs with: docker-compose -f docker-compose.prod.yml logs"
+    echo -e "${RED}❌ Error: Backend service failed to start!${NC}"
+    echo "Check logs with: docker-compose logs backend"
     exit 1
 fi
 
