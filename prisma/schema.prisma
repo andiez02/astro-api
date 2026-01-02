@@ -1,0 +1,55 @@
+// =============================================================================
+// Prisma Schema - Astro NFT Marketplace
+// =============================================================================
+// Run `npx prisma migrate dev` to create migration
+// Run `npx prisma generate` to create Prisma Client
+// =============================================================================
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// =============================================================================
+// User Model
+// =============================================================================
+model User {
+    id            String @id @default(uuid())
+    walletAddress String @unique @map("wallet_address")
+
+    nonce String?
+
+    username String?
+    bio      String? @db.Text
+    avatar   String?
+    role     String  @default("USER")
+
+    nfts Nft[]
+
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("users")
+}
+
+// =============================================================================
+// NFT Model
+// =============================================================================
+model Nft {
+    id          String   @id @default(uuid())
+    title       String
+    description String?
+    price       Decimal  @db.Decimal(36, 18)
+    imageUrl    String   @map("image_url")
+    ownerId     String   @map("owner_id")
+    owner       User     @relation(fields: [ownerId], references: [id])
+    isListed    Boolean  @default(false) @map("is_listed")
+    createdAt   DateTime @default(now()) @map("created_at")
+
+    @@index([ownerId])
+    @@index([isListed])
+    @@map("nfts")
+}
