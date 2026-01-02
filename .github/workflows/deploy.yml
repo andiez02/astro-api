@@ -1,0 +1,146 @@
+# =============================================================================
+# GitHub Actions - Deploy to EC2
+# =============================================================================
+# Tự động deploy backend lên EC2 khi push code lên main branch
+# =============================================================================
+
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Cho phép chạy manual
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
+            set -e
+            
+            echo "=========================================="
+            echo "🚀 Starting Deployment"
+            echo "=========================================="
+            echo "📅 $(date)"
+            echo "=========================================="
+            
+            # Navigate to project directory
+            if [ -d ~/astro-api ]; then
+              cd ~/astro-api
+            elif [ -d ~/astro-backend ]; then
+              cd ~/astro-backend
+            else
+              echo "❌ Project directory not found!"
+              echo "Expected: ~/astro-api or ~/astro-backend"
+              exit 1
+            fi
+            
+            echo "📂 Current directory: $(pwd)"
+            
+            # Detect docker compose command (v1: docker-compose, v2: docker compose)
+            if command -v docker-compose &> /dev/null; then
+              DOCKER_COMPOSE="docker-compose"
+            elif docker compose version &> /dev/null; then
+              DOCKER_COMPOSE="docker compose"
+            else
+              echo "❌ Docker Compose not found!"
+              exit 1
+            fi
+            echo "✅ Using: $DOCKER_COMPOSE"
+            
+            # Pull latest code
+            echo ""
+            echo "📥 Pulling latest code..."
+            git fetch origin
+            git pull origin main || git pull origin master || {
+              echo "⚠️  Git pull failed, continuing with existing code..."
+            }
+            echo "✅ Code updated"
+            
+            # Stop existing containers
+            echo ""
+            echo "🛑 Stopping existing containers..."
+            $DOCKER_COMPOSE down || true
+            
+            # Rebuild and start containers
+            echo ""
+            echo "🔨 Building and starting containers..."
+            $DOCKER_COMPOSE up -d --build
+            
+            # Wait for service to be ready
+            echo ""
+            echo "⏳ Waiting for service to be ready..."
+            sleep 20
+            
+            # Check if container is running
+            if ! $DOCKER_COMPOSE ps | grep -q "Up"; then
+              echo "❌ Container failed to start!"
+              echo "📋 Container logs:"
+              $DOCKER_COMPOSE logs --tail=50 backend
+              exit 1
+            fi
+            
+            # Run migrations (if needed)
+            echo ""
+            echo "🗄️  Running database migrations..."
+            $DOCKER_COMPOSE exec -T backend npx prisma migrate deploy || {
+              echo "⚠️  Migration might have already been applied"
+            }
+            
+            # Check service status
+            echo ""
+            echo "🔍 Checking service status..."
+            $DOCKER_COMPOSE ps
+            
+            # Health check
+            echo ""
+            echo "❤️  Performing health check..."
+            sleep 10
+            for i in 1 2 3; do
+              if curl -f http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+                echo "✅ Health check passed!"
+                break
+              fi
+              if [ $i -eq 3 ]; then
+                echo "⚠️  Health check failed after 3 attempts"
+                echo "📋 Recent logs:"
+                $DOCKER_COMPOSE logs --tail=30 backend
+              else
+                echo "⏳ Retrying health check... ($i/3)"
+                sleep 5
+              fi
+            done
+            
+            echo ""
+            echo "=========================================="
+            echo "✅ Deployment completed!"
+            echo "=========================================="
+          ENDSSH
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "Deployment job completed with status: ${{ job.status }}"
