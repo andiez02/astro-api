@@ -38,7 +38,7 @@ export class UsersController {
     return {
       id: user.id,
       username: user.username,
-      walletAddress: user.walletAddress,
+      walletAddress: address.toLowerCase(), // Wallet address from param
       avatar: user.avatar,
       bio: user.bio,
       createdAt: user.createdAt,

@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from '@prisma/client';
+import { User, Wallet } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -11,36 +11,81 @@ export class UsersService {
 
   // 1. Tìm user theo Address (AuthService sẽ dùng cái này để verify)
   async findByAddress(walletAddress: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: {
-        walletAddress: walletAddress.toLowerCase(),
-      },
+    const lowerAddress = walletAddress.toLowerCase();
+
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { address: lowerAddress },
+      include: { user: true },
+    });
+
+    return wallet?.user ?? null;
+  }
+
+  // 2. Tìm wallet theo address (để lấy nonce cho SIWE verify)
+  async findWalletByAddress(walletAddress: string): Promise<Wallet | null> {
+    const lowerAddress = walletAddress.toLowerCase();
+
+    return this.prisma.wallet.findUnique({
+      where: { address: lowerAddress },
     });
   }
 
-  // 2. Tạo hoặc Update Nonce (Logic cốt lõi của SIWE)
-  // Nếu user chưa tồn tại -> Tạo mới kèm nonce
-  // Nếu user đã tồn tại -> Update nonce mới
+  // 3. Tạo hoặc Update Nonce (Logic cốt lõi của SIWE)
+  // Nếu wallet chưa tồn tại -> Tạo User mới + Wallet kèm nonce
+  // Nếu wallet đã tồn tại -> Update nonce trên wallet
   async upsertNonce(walletAddress: string, nonce: string): Promise<User> {
     const lowerAddress = walletAddress.toLowerCase();
 
-    return this.prisma.user.upsert({
-      where: { walletAddress: lowerAddress },
-      create: {
-        walletAddress: lowerAddress,
-        nonce: nonce,
-        username: lowerAddress.slice(0, 8), // Default username tạm
-      },
-      update: {
-        nonce: nonce,
-      },
+    // Tìm wallet hiện có
+    const existingWallet = await this.prisma.wallet.findUnique({
+      where: { address: lowerAddress },
+      include: { user: true },
     });
+
+    if (!existingWallet) {
+      // Tạo User mới + Wallet mới
+      const user = await this.prisma.user.create({
+        data: {
+          username: lowerAddress.slice(0, 8),
+          wallets: {
+            create: {
+              address: lowerAddress,
+              nonce,
+            },
+          },
+        },
+      });
+      return user;
+    }
+
+    // Update nonce trên wallet
+    await this.prisma.wallet.update({
+      where: { address: lowerAddress },
+      data: { nonce },
+    });
+
+    // Nếu wallet chưa có user, tạo user mới
+    if (!existingWallet.user) {
+      const user = await this.prisma.user.create({
+        data: {
+          username: lowerAddress.slice(0, 8),
+          wallets: {
+            connect: { address: lowerAddress },
+          },
+        },
+      });
+      return user;
+    }
+
+    return existingWallet.user;
   }
 
-  // 3. Update Nonce sau khi login thành công (để chống Replay Attack)
-  async updateNonce(userId: string, newNonce: string) {
-    return this.prisma.user.update({
-      where: { id: userId },
+  // 4. Update Nonce sau khi login thành công (để chống Replay Attack)
+  async updateNonce(walletAddress: string, newNonce: string): Promise<Wallet> {
+    const lowerAddress = walletAddress.toLowerCase();
+
+    return this.prisma.wallet.update({
+      where: { address: lowerAddress },
       data: { nonce: newNonce },
     });
   }

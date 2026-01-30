@@ -13,6 +13,9 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { CollectionsModule } from './modules/collections/collections.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { IndexerModule } from './indexer/indexer.module';
 
 @Module({
   imports: [
@@ -28,6 +31,12 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
 
     UsersModule,
+
+    CollectionsModule,
+
+    UploadModule,
+
+    IndexerModule,
   ],
   controllers: [],
   providers: [],
