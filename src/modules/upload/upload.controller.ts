@@ -4,9 +4,10 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
-} from '@nestjs/common'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { UploadsService } from './upload.service'
+  Body,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadsService } from './upload.service';
 
 @Controller('upload')
 export class UploadsController {
@@ -19,22 +20,26 @@ export class UploadsController {
         fileSize: 20 * 1024 * 1024, // 20MB
       },
       fileFilter: (_, file, cb) => {
-        if (!file.mimetype.startsWith('image/') &&
-            !file.mimetype.startsWith('video/')) {
-          return cb(
-            new BadRequestException('Invalid file type'),
-            false,
-          )
+        if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+          return cb(new BadRequestException('Invalid file type'), false);
         }
-        cb(null, true)
+        cb(null, true);
       },
     }),
   )
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('File is required')
+      throw new BadRequestException('File is required');
     }
 
-    return this.uploadsService.uploadToIPFS(file)
+    return this.uploadsService.uploadToIPFS(file);
+  }
+
+  @Post('metadata')
+  async uploadMetadata(@Body() metadata: any) {
+    if (!metadata) {
+      throw new BadRequestException('Metadata is required');
+    }
+    return this.uploadsService.uploadMetadata(metadata);
   }
 }

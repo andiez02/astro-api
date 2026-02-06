@@ -15,6 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { NftsModule } from './modules/nfts/nfts.module';
 import { IndexerModule } from './indexer/indexer.module';
 
 @Module({
@@ -35,6 +36,8 @@ import { IndexerModule } from './indexer/indexer.module';
     CollectionsModule,
 
     UploadModule,
+
+    NftsModule,
 
     IndexerModule,
   ],
